@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "633793611105",
+    "project_id": "asistant-ia",
+    "storage_bucket": "asistant-ia.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:633793611105:android:c521081ba300069f2b3120",
+        "android_client_info": {
+          "package_name": "com.example.frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCY03dx4h19wF_FLGptmPhavnoijk-SsnY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

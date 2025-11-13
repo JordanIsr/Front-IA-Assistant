@@ -37,6 +37,9 @@ dependencies:
   font_awesome_flutter: ^10.9.1
   google_generative_ai: ^0.4.7
   firebase_core: ^4.2.1
+  firebase_auth: ^6.1.2
+  cloud_firestore: ^6.1.0
+
 
 dev_dependencies:
   flutter_test:

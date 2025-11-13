@@ -1,204 +1,162 @@
-// ARCHIVO: frontend/lib/screens/chat_screen.dart
 import 'package:flutter/material.dart';
-import 'dart:async'; // Necesario para el retraso del bot
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final String? conversationId; // 👈 Nuevo parámetro
+  const ChatScreen({super.key, this.conversationId});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final TextEditingController _textController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
-  final List<Map<String, String>> _messages = [];
-  bool _isBotTyping = false; // Para mostrar "Bot está escribiendo..."
+  final TextEditingController _messageController = TextEditingController();
+  final User? _currentUser = FirebaseAuth.instance.currentUser;
 
-  // --- LÓGICA DE LA APP ---
+  late String _conversationId;
 
-  void _handleSendPressed() {
-    final text = _textController.text;
-    if (text.isEmpty || _isBotTyping) return;
+  @override
+  void initState() {
+    super.initState();
+    // Si no se pasa ID, crear uno nuevo
+    _conversationId =
+        widget.conversationId ??
+        DateTime.now().millisecondsSinceEpoch.toString();
 
-    _textController.clear();
-    setState(() {
-      _messages.add({'sender': 'user', 'text': text});
-      _isBotTyping = true; // El bot empieza a "pensar"
-    });
-    _scrollToBottom();
-
-    // Llamamos a la lógica del bot simulado
-    _callSmartBot(text);
-  }
-
-  // --- LÓGICA DE BOT INTELIGENTE (SIN INTERNET) ---
-
-  // Esta función decide qué responder
-  String _getBotResponse(String userMessage) {
-    String message = userMessage.toLowerCase();
-
-    // Respuestas pre-programadas
-    final Map<String, String> responses = {
-      'hola': '¡Hola! ¿Cómo te sientes hoy?',
-      'bien': '¡Me alegra escuchar eso! ¿En qué puedo ayudarte?',
-      'mal': 'Lamento escuchar eso. ¿Quieres hablar sobre lo que te sucede?',
-      'triste':
-          'Está bien sentirse triste a veces. Hablar de ello puede ayudar. ¿Qué te pasa?',
-      'depresion':
-          'La depresión es un tema serio. Recuerda que no estás solo y hablar con un profesional puede ser de gran ayuda.',
-      'ansiedad':
-          'La ansiedad es una reacción común. Intenta respirar profundo. ¿Qué está causando tu ansiedad ahora mismo?',
-      'ayuda':
-          'Estoy aquí para escucharte. También puedes contactar a líneas de apoyo profesional si lo necesitas.',
-      'adios':
-          'Que tengas un buen día. Recuerda que estoy aquí si necesitas hablar.',
-    };
-
-    // Buscamos una palabra clave
-    for (String keyword in responses.keys) {
-      if (message.contains(keyword)) {
-        return responses[keyword]!; // Devuelve la respuesta asociada
-      }
+    // Si es nuevo, registrar la conversación
+    if (widget.conversationId == null && _currentUser != null) {
+      FirebaseFirestore.instance
+          .collection('chats')
+          .doc(_currentUser.uid)
+          .collection('conversations')
+          .doc(_conversationId)
+          .set({
+            'createdAt': FieldValue.serverTimestamp(),
+            'title': 'Nueva conversación',
+          });
     }
-
-    // Respuesta genérica
-    return 'Entendido. Es un tema interesante. ¿Puedes contarme más al respecto?';
-  }
-
-  // Esta función "simula" el pensamiento del bot
-  void _callSmartBot(String userMessage) {
-    // Simular un retraso de 1 segundo
-    Timer(const Duration(seconds: 1), () {
-      String botReply = _getBotResponse(userMessage);
-
-      setState(() {
-        _isBotTyping = false; // El bot deja de "pensar"
-        _messages.add({'sender': 'bot', 'text': botReply});
-      });
-      _scrollToBottom();
-    });
-  }
-
-  // --- FIN DE LA LÓGICA DEL BOT ---
-
-  void _scrollToBottom() {
-    Timer(const Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
   }
 
   @override
   void dispose() {
-    _textController.dispose();
-    _scrollController.dispose();
+    _messageController.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Asistente Personal'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              Navigator.pushReplacementNamed(context, '/login');
-            },
-          ),
-        ],
-      ),
+  Future<void> _sendMessage() async {
+    final text = _messageController.text.trim();
+    if (text.isEmpty || _currentUser == null) return;
 
-      // --- MENÚ LATERAL (DRAWER) ---
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(color: Colors.blue),
-              child: Text(
-                'Historial de Chats',
-                style: TextStyle(color: Colors.white, fontSize: 24),
+    _messageController.clear();
+    FocusScope.of(context).unfocus();
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(_currentUser.uid)
+          .collection('conversations')
+          .doc(_conversationId)
+          .collection('messages')
+          .add({
+            'text': text,
+            'createdAt': FieldValue.serverTimestamp(),
+            'role': 'user',
+          });
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al enviar: $e')));
+    }
+  }
+
+  Widget _buildMessagesList() {
+    if (_currentUser == null) {
+      return const Center(child: Text('No hay usuario logueado.'));
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream:
+          FirebaseFirestore.instance
+              .collection('chats')
+              .doc(_currentUser.uid)
+              .collection('conversations')
+              .doc(_conversationId)
+              .collection('messages')
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(
+            child: Text(
+              'Aún no hay mensajes.\n¡Dile hola a tu asistente!',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          );
+        }
+
+        final messages = snapshot.data!.docs;
+        return ListView.builder(
+          reverse: true,
+          itemCount: messages.length,
+          itemBuilder: (context, index) {
+            final msg = messages[index].data() as Map<String, dynamic>;
+            final isUser = msg['role'] == 'user';
+
+            return Align(
+              alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: isUser ? Colors.blueAccent : Colors.grey.shade200,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(16),
+                    topRight: const Radius.circular(16),
+                    bottomLeft:
+                        isUser ? const Radius.circular(16) : Radius.zero,
+                    bottomRight:
+                        isUser ? Radius.zero : const Radius.circular(16),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 3,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  msg['text'] ?? '',
+                  style: TextStyle(
+                    color: isUser ? Colors.white : Colors.black87,
+                    fontSize: 15,
+                  ),
+                ),
               ),
-            ),
-            // Opciones simuladas
-            ListTile(
-              leading: const Icon(Icons.chat_bubble_outline),
-              title: const Text('Clonar Repositorio Git'), //
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.chat_bubble_outline),
-              title: const Text('Anime Mitológico'), //
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.add),
-              title: const Text('Nueva Conversación'), //
-              onTap: () {
-                // Reinicia el chat
-                Navigator.pop(context); // Cierra el drawer
-                setState(() {
-                  _messages.clear(); // Borra los mensajes
-                });
-              },
-            ),
-          ],
-        ),
-      ),
-
-      // --- FIN DEL MENÚ LATERAL ---
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(8.0),
-              itemCount: _messages.length + (_isBotTyping ? 1 : 0),
-              itemBuilder: (context, index) {
-                // Muestra el indicador de "escribiendo..."
-                if (index == _messages.length && _isBotTyping) {
-                  return const _TypingIndicator();
-                }
-
-                final message = _messages[index];
-                final isUserMessage = message['sender'] == 'user';
-
-                return _ChatMessageBubble(
-                  text: message['text']!,
-                  isUserMessage: isUserMessage,
-                );
-              },
-            ),
-          ),
-          _buildChatInputBar(),
-        ],
-      ),
+            );
+          },
+        );
+      },
     );
   }
 
-  // Barra de entrada de texto
-  Widget _buildChatInputBar() {
+  Widget _buildMessageInputBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        boxShadow: const [
+        color: Colors.white,
+        boxShadow: [
           BoxShadow(
-            blurRadius: 4,
             color: Colors.black12,
+            blurRadius: 6,
             offset: Offset(0, -2),
           ),
         ],
@@ -207,84 +165,125 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           Expanded(
             child: TextField(
-              controller: _textController,
-              decoration: const InputDecoration(
+              controller: _messageController,
+              decoration: InputDecoration(
                 hintText: 'Escribe tu mensaje...',
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 16.0),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
+                ),
               ),
-              onSubmitted: (_) => _handleSendPressed(),
+              onSubmitted: (_) => _sendMessage(),
             ),
           ),
-          // Botón de enviar (se deshabilita si el bot está escribiendo)
-          IconButton(
-            icon: const Icon(Icons.send),
-            onPressed: _isBotTyping ? null : _handleSendPressed,
-            color: Theme.of(context).primaryColor,
+          const SizedBox(width: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.blueAccent,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.blueAccent.withOpacity(0.3),
+                  blurRadius: 6,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.send, color: Colors.white),
+              onPressed: _sendMessage,
+            ),
           ),
         ],
       ),
     );
   }
-}
 
-// --- WIDGET PARA LA BURBUJA DE CHAT ---
-class _ChatMessageBubble extends StatelessWidget {
-  final String text;
-  final bool isUserMessage;
-
-  const _ChatMessageBubble({required this.text, required this.isUserMessage});
-
-  @override
-  Widget build(BuildContext context) {
-    final alignment =
-        isUserMessage ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-    final bubbleColor = isUserMessage ? Colors.blue[100] : Colors.grey[200];
-    final textColor = isUserMessage ? Colors.black87 : Colors.black;
-
-    return Column(
-      crossAxisAlignment: alignment,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.75,
+  Drawer _buildDrawer(BuildContext context) {
+    return Drawer(
+      backgroundColor: Colors.white,
+      child: Column(
+        children: [
+          UserAccountsDrawerHeader(
+            accountName: Text(_currentUser?.email?.split('@')[0] ?? 'Usuario'),
+            accountEmail: Text(_currentUser?.email ?? 'Sin correo'),
+            currentAccountPicture: const CircleAvatar(
+              backgroundColor: Colors.white,
+              child: Icon(Icons.person, size: 40, color: Colors.blueAccent),
+            ),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xff42a5f5), Color(0xff1e88e5)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
           ),
-          decoration: BoxDecoration(
-            color: bubbleColor,
-            borderRadius: BorderRadius.circular(16),
+          ListTile(
+            leading: const Icon(Icons.add_comment, color: Colors.green),
+            title: const Text('Nuevo Chat'),
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const ChatScreen()),
+              );
+            },
           ),
-          child: Text(text, style: TextStyle(color: textColor, fontSize: 16)),
-        ),
-      ],
+          ListTile(
+            leading: const Icon(Icons.history, color: Colors.blueAccent),
+            title: const Text('Historial del Chat'),
+            onTap: () => Navigator.pushNamed(context, '/historial'),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.redAccent),
+            title: const Text('Cerrar Sesión'),
+            onTap: () async {
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted)
+                Navigator.pushReplacementNamed(context, '/login');
+            },
+          ),
+        ],
+      ),
     );
   }
-}
-
-// --- WIDGET PARA EL INDICADOR DE "ESCRIBIENDO..." ---
-class _TypingIndicator extends StatelessWidget {
-  const _TypingIndicator();
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-          decoration: BoxDecoration(
-            color: Colors.grey[200],
-            borderRadius: BorderRadius.circular(16),
-          ),
-          // Usamos 3 puntos como en apps de mensajería
-          child: const Text(
-            "...",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+    return Scaffold(
+      drawer: _buildDrawer(context),
+      appBar: AppBar(
+        title: const Text(
+          'Asistente IA',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.blueAccent,
+        elevation: 4,
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xffe3f2fd), Color(0xffbbdefb)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
         ),
-      ],
+        child: SafeArea(
+          child: Column(
+            children: [
+              Expanded(child: _buildMessagesList()),
+              _buildMessageInputBar(),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
