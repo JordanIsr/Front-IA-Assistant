@@ -37,8 +37,9 @@ class HistorialScreen extends StatelessWidget {
                   .orderBy('createdAt', descending: true)
                   .snapshots(),
           builder: (context, snapshot) {
-            if (!snapshot.hasData)
+            if (!snapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
+            }
             if (snapshot.data!.docs.isEmpty) {
               return const Center(
                 child: Text('No hay conversaciones guardadas.'),

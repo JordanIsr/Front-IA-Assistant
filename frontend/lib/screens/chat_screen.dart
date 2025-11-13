@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:frontend/api_service.dart'; // ✅ Ahora sí se usa
 
 class ChatScreen extends StatefulWidget {
-  final String? conversationId; // 👈 Nuevo parámetro
+  final String? conversationId;
   const ChatScreen({super.key, this.conversationId});
 
   @override
@@ -15,10 +16,12 @@ class _ChatScreenState extends State<ChatScreen> {
   final User? _currentUser = FirebaseAuth.instance.currentUser;
 
   late String _conversationId;
+  bool _isSending = false; // Para evitar doble envío
 
   @override
   void initState() {
     super.initState();
+
     // Si no se pasa ID, crear uno nuevo
     _conversationId =
         widget.conversationId ??
@@ -46,12 +49,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
-    if (text.isEmpty || _currentUser == null) return;
+    if (text.isEmpty || _currentUser == null || _isSending) return;
 
+    setState(() => _isSending = true);
     _messageController.clear();
     FocusScope.of(context).unfocus();
 
     try {
+      // Guardar mensaje del usuario en Firestore
       await FirebaseFirestore.instance
           .collection('chats')
           .doc(_currentUser.uid)
@@ -63,10 +68,28 @@ class _ChatScreenState extends State<ChatScreen> {
             'createdAt': FieldValue.serverTimestamp(),
             'role': 'user',
           });
+
+      // ✅ Llamar a la API de tu backend (api_service.dart)
+      final aiResponse = await ApiService.sendMessage(text);
+
+      // Guardar respuesta de la IA
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(_currentUser.uid)
+          .collection('conversations')
+          .doc(_conversationId)
+          .collection('messages')
+          .add({
+            'text': aiResponse,
+            'createdAt': FieldValue.serverTimestamp(),
+            'role': 'assistant',
+          });
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Error al enviar: $e')));
+      ).showSnackBar(SnackBar(content: Text('Error al enviar mensaje: $e')));
+    } finally {
+      setState(() => _isSending = false);
     }
   }
 
@@ -157,7 +180,7 @@ class _ChatScreenState extends State<ChatScreen> {
           BoxShadow(
             color: Colors.black12,
             blurRadius: 6,
-            offset: Offset(0, -2),
+            offset: const Offset(0, -2),
           ),
         ],
       ),
@@ -191,7 +214,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 BoxShadow(
                   color: Colors.blueAccent.withOpacity(0.3),
                   blurRadius: 6,
-                  offset: Offset(0, 3),
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
@@ -246,8 +269,9 @@ class _ChatScreenState extends State<ChatScreen> {
             title: const Text('Cerrar Sesión'),
             onTap: () async {
               await FirebaseAuth.instance.signOut();
-              if (context.mounted)
+              if (context.mounted) {
                 Navigator.pushReplacementNamed(context, '/login');
+              }
             },
           ),
         ],
