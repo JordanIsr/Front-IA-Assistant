@@ -86,6 +86,7 @@ class _ChatScreenState extends State<ChatScreen> {
           });
     } catch (e) {
       ScaffoldMessenger.of(
+        // ignore: use_build_context_synchronously
         context,
       ).showSnackBar(SnackBar(content: Text('Error al enviar mensaje: $e')));
     } finally {
@@ -212,6 +213,7 @@ class _ChatScreenState extends State<ChatScreen> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
+                  // ignore: deprecated_member_use
                   color: Colors.blueAccent.withOpacity(0.3),
                   blurRadius: 6,
                   offset: const Offset(0, 3),
