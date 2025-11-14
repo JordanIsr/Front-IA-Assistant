@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   static const String baseUrl =
-      'https://tu-backend.cloudfunctions.net/chatWithAI';
+      'http://127.0.0.1:5001/asistant-ia/us-central1/chatWithAI';
 
   static Future<String> sendMessage(String message) async {
     final response = await http.post(
