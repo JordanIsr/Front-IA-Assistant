@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:frontend/screens/home_screen.dart';
 import 'firebase_options.dart';
 import 'package:frontend/screens/login_screen.dart';
 import 'package:frontend/screens/register_screen.dart';
@@ -30,7 +31,8 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/chat': (context) => const ChatScreen(),
-        '/historial': (context) => const HistorialScreen(), // 🟩 Nueva ruta
+        '/historial': (context) => const HistorialScreen(),
+        '/home': (context) => const HomeScreen(),
       },
     );
   }

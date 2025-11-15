@@ -17,28 +17,24 @@ class _ChatScreenState extends State<ChatScreen> {
 
   late String _conversationId;
   bool _isSending = false; // Para evitar doble envío
+  // 🆕 Bandera para saber si el documento de conversación ya existe en Firestore
+  late bool _isNewConversation;
 
   @override
   void initState() {
     super.initState();
 
-    // Si no se pasa ID, crear uno nuevo
-    _conversationId =
-        widget.conversationId ??
-        DateTime.now().millisecondsSinceEpoch.toString();
-
-    // Si es nuevo, registrar la conversación
-    if (widget.conversationId == null && _currentUser != null) {
-      FirebaseFirestore.instance
-          .collection('chats')
-          .doc(_currentUser.uid)
-          .collection('conversations')
-          .doc(_conversationId)
-          .set({
-            'createdAt': FieldValue.serverTimestamp(),
-            'title': 'Nueva conversación',
-          });
+    // Si no se pasa ID, crear uno nuevo (temporal)
+    if (widget.conversationId == null) {
+      _conversationId = DateTime.now().millisecondsSinceEpoch.toString();
+      _isNewConversation = true; // Es nuevo, aún no está guardado en Firestore
+    } else {
+      _conversationId = widget.conversationId!;
+      _isNewConversation = false; // Ya existe en Firestore
     }
+
+    // ❌ ELIMINAMOS la lógica de .set() de aquí.
+    // El registro de la conversación en Firestore se creará solo al enviar el primer mensaje.
   }
 
   @override
@@ -56,6 +52,22 @@ class _ChatScreenState extends State<ChatScreen> {
     FocusScope.of(context).unfocus();
 
     try {
+      // 🚀 LÓGICA CLAVE: CREAR EL REGISTRO DE CONVERSACIÓN SOLO SI ES NUEVO
+      if (_isNewConversation) {
+        await FirebaseFirestore.instance
+            .collection('chats')
+            .doc(_currentUser.uid)
+            .collection('conversations')
+            .doc(_conversationId)
+            .set({
+              'createdAt': FieldValue.serverTimestamp(),
+              'title': 'Nueva conversación', // Se puede renombrar luego
+            });
+
+        // Marcamos como no nuevo para que no se vuelva a crear el registro
+        _isNewConversation = false;
+      }
+
       // Guardar mensaje del usuario en Firestore
       await FirebaseFirestore.instance
           .collection('chats')
@@ -85,21 +97,37 @@ class _ChatScreenState extends State<ChatScreen> {
             'role': 'assistant',
           });
     } catch (e) {
-      ScaffoldMessenger.of(
-        // ignore: use_build_context_synchronously
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error al enviar mensaje: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al enviar mensaje: $e')));
+      }
     } finally {
       setState(() => _isSending = false);
     }
   }
+
+  // El resto del código se mantiene igual...
 
   Widget _buildMessagesList() {
     if (_currentUser == null) {
       return const Center(child: Text('No hay usuario logueado.'));
     }
 
+    // Si es una conversación nueva y aún no se ha enviado el primer mensaje,
+    // no hay necesidad de hacer un StreamBuilder a un documento que no existe
+    if (_isNewConversation) {
+      return const Center(
+        child: Text(
+          'Aún no hay mensajes.\n¡Dile hola a tu asistente!',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+      );
+    }
+
     return StreamBuilder<QuerySnapshot>(
+      // ... (Consulta de Firestore igual, ya que el ID de conversación ya está asignado)
       stream:
           FirebaseFirestore.instance
               .collection('chats')
