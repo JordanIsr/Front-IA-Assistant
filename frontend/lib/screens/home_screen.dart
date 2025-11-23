@@ -1,6 +1,7 @@
 // ignore_for_file: deprecated_member_use, unnecessary_to_list_in_spreads
 
 import 'package:flutter/material.dart';
+import 'package:frontend/screens/widgets/menu_drawer.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -145,6 +146,7 @@ class _HomeScreenState extends State<HomeScreen>
         _selectedTitle != null && selectedMenu.isNotEmpty;
 
     return Scaffold(
+      drawer: const MenuDrawer(),
       appBar: AppBar(
         title: const Text(
           'Mi Espacio de Apoyo',

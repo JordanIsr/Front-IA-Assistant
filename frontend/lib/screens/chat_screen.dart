@@ -9,6 +9,9 @@ import 'package:frontend/api_service.dart';
 import 'package:frontend/screens/services/speech_service.dart';
 import 'package:frontend/screens/services/text_to_speech_service.dart';
 
+// 📌 IMPORTA TU MENÚ SEPARADO
+import 'package:frontend/screens/widgets/menu_drawer.dart';
+
 class ChatScreen extends StatefulWidget {
   final String? conversationId;
   const ChatScreen({super.key, this.conversationId});
@@ -77,9 +80,9 @@ class _ChatScreenState extends State<ChatScreen> {
             .collection('conversations')
             .doc(_conversationId)
             .set({
-              'createdAt': FieldValue.serverTimestamp(),
-              'title': 'Nueva conversación',
-            });
+          'createdAt': FieldValue.serverTimestamp(),
+          'title': 'Nueva conversación',
+        });
 
         _isNewConversation = false;
       }
@@ -92,10 +95,10 @@ class _ChatScreenState extends State<ChatScreen> {
           .doc(_conversationId)
           .collection('messages')
           .add({
-            'text': text,
-            'createdAt': FieldValue.serverTimestamp(),
-            'role': 'user',
-          });
+        'text': text,
+        'createdAt': FieldValue.serverTimestamp(),
+        'role': 'user',
+      });
 
       // llamar API
       final aiResponse = await ApiService.sendMessage(text);
@@ -108,18 +111,17 @@ class _ChatScreenState extends State<ChatScreen> {
           .doc(_conversationId)
           .collection('messages')
           .add({
-            'text': aiResponse,
-            'createdAt': FieldValue.serverTimestamp(),
-            'role': 'assistant',
-          });
+        'text': aiResponse,
+        'createdAt': FieldValue.serverTimestamp(),
+        'role': 'assistant',
+      });
 
       // 🔊 IA habla su respuesta
       await _tts.speak(aiResponse);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error al enviar: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error al enviar: $e')));
     } finally {
       setState(() => _isSending = false);
     }
@@ -141,15 +143,14 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     return StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('chats')
-              .doc(_currentUser.uid)
-              .collection('conversations')
-              .doc(_conversationId)
-              .collection('messages')
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('chats')
+          .doc(_currentUser.uid)
+          .collection('conversations')
+          .doc(_conversationId)
+          .collection('messages')
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -177,10 +178,8 @@ class _ChatScreenState extends State<ChatScreen> {
               alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
               child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   color: isUser ? Colors.blueAccent : Colors.grey.shade200,
                   borderRadius: BorderRadius.only(
@@ -293,89 +292,10 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Drawer _buildDrawer(BuildContext context) {
-    return Drawer(
-      backgroundColor: Colors.white,
-      child: Column(
-        children: [
-          UserAccountsDrawerHeader(
-            accountName: Text(_currentUser?.email?.split("@")[0] ?? "Usuario"),
-            accountEmail: Text(_currentUser?.email ?? "Sin correo"),
-            currentAccountPicture: const CircleAvatar(
-              backgroundColor: Colors.white,
-              child: Icon(Icons.person, size: 40, color: Colors.blueAccent),
-            ),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xff42a5f5), Color(0xff1e88e5)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.add_comment, color: Colors.green),
-            title: const Text("Nuevo Chat"),
-            onTap: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const ChatScreen()),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.history, color: Colors.blueAccent),
-            title: const Text("Historial del Chat"),
-            onTap: () => Navigator.pushNamed(context, '/historial'),
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.home, color: Colors.blueAccent),
-            title: const Text("Inicio"),
-            onTap: () => Navigator.pushNamed(context, '/home'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.menu_book, color: Colors.purple),
-            title: const Text("Librería"),
-            onTap: () => Navigator.pushNamed(context, '/library'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.toys_outlined, color: Colors.orange),
-            title: const Text("Zona Anti-Estrés"),
-            onTap: () => Navigator.pushNamed(context, '/distraction-zone'),
-          ),
-          ListTile(
-            leading: const Icon(
-              Icons.medical_services,
-              color: Colors.redAccent,
-            ),
-            title: const Text("Recursos y Especialistas"),
-            onTap: () => Navigator.pushNamed(context, '/professional-help'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.settings, color: Colors.grey),
-            title: const Text("Configuración"),
-            onTap: () => Navigator.pushNamed(context, '/settings'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.redAccent),
-            title: const Text("Cerrar Sesión"),
-            onTap: () async {
-              await FirebaseAuth.instance.signOut();
-              if (context.mounted) {
-                Navigator.pushReplacementNamed(context, '/login');
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: _buildDrawer(context),
+      drawer: const MenuDrawer(), // ←📌 MENÚ REUTILIZABLE
       appBar: AppBar(
         title: const Text(
           "Asistente IA",
