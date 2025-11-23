@@ -1,7 +1,13 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:frontend/api_service.dart'; // ✅ Ahora sí se usa
+import 'package:frontend/api_service.dart';
+
+// 🎤 Servicios nuevos
+import 'package:frontend/screens/services/speech_service.dart';
+import 'package:frontend/screens/services/text_to_speech_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String? conversationId;
@@ -16,31 +22,43 @@ class _ChatScreenState extends State<ChatScreen> {
   final User? _currentUser = FirebaseAuth.instance.currentUser;
 
   late String _conversationId;
-  bool _isSending = false; // Para evitar doble envío
-  // 🆕 Bandera para saber si el documento de conversación ya existe en Firestore
   late bool _isNewConversation;
+
+  bool _isSending = false;
+
+  // 🎤 Instancias de servicios de voz
+  final SpeechService _speechService = SpeechService();
+  final TextToSpeechService _tts = TextToSpeechService();
 
   @override
   void initState() {
     super.initState();
 
-    // Si no se pasa ID, crear uno nuevo (temporal)
     if (widget.conversationId == null) {
       _conversationId = DateTime.now().millisecondsSinceEpoch.toString();
-      _isNewConversation = true; // Es nuevo, aún no está guardado en Firestore
+      _isNewConversation = true;
     } else {
       _conversationId = widget.conversationId!;
-      _isNewConversation = false; // Ya existe en Firestore
+      _isNewConversation = false;
     }
-
-    // ❌ ELIMINAMOS la lógica de .set() de aquí.
-    // El registro de la conversación en Firestore se creará solo al enviar el primer mensaje.
   }
 
   @override
   void dispose() {
     _messageController.dispose();
     super.dispose();
+  }
+
+  // 🎤 Función para procesar voz → texto
+  Future<void> _handleVoiceInput() async {
+    final text = await _speechService.startListening();
+    if (text == null || text.isEmpty) return;
+
+    setState(() {
+      _messageController.text = text;
+    });
+
+    await _sendMessage();
   }
 
   Future<void> _sendMessage() async {
@@ -52,7 +70,6 @@ class _ChatScreenState extends State<ChatScreen> {
     FocusScope.of(context).unfocus();
 
     try {
-      // 🚀 LÓGICA CLAVE: CREAR EL REGISTRO DE CONVERSACIÓN SOLO SI ES NUEVO
       if (_isNewConversation) {
         await FirebaseFirestore.instance
             .collection('chats')
@@ -61,14 +78,13 @@ class _ChatScreenState extends State<ChatScreen> {
             .doc(_conversationId)
             .set({
               'createdAt': FieldValue.serverTimestamp(),
-              'title': 'Nueva conversación', // Se puede renombrar luego
+              'title': 'Nueva conversación',
             });
 
-        // Marcamos como no nuevo para que no se vuelva a crear el registro
         _isNewConversation = false;
       }
 
-      // Guardar mensaje del usuario en Firestore
+      // guardar mensaje de usuario
       await FirebaseFirestore.instance
           .collection('chats')
           .doc(_currentUser.uid)
@@ -81,10 +97,10 @@ class _ChatScreenState extends State<ChatScreen> {
             'role': 'user',
           });
 
-      // ✅ Llamar a la API de tu backend (api_service.dart)
+      // llamar API
       final aiResponse = await ApiService.sendMessage(text);
 
-      // Guardar respuesta de la IA
+      // guardar respuesta IA
       await FirebaseFirestore.instance
           .collection('chats')
           .doc(_currentUser.uid)
@@ -96,38 +112,35 @@ class _ChatScreenState extends State<ChatScreen> {
             'createdAt': FieldValue.serverTimestamp(),
             'role': 'assistant',
           });
+
+      // 🔊 IA habla su respuesta
+      await _tts.speak(aiResponse);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error al enviar mensaje: $e')));
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al enviar: $e')));
     } finally {
       setState(() => _isSending = false);
     }
   }
 
-  // El resto del código se mantiene igual...
-
   Widget _buildMessagesList() {
     if (_currentUser == null) {
-      return const Center(child: Text('No hay usuario logueado.'));
+      return const Center(child: Text("No hay usuario logueado."));
     }
 
-    // Si es una conversación nueva y aún no se ha enviado el primer mensaje,
-    // no hay necesidad de hacer un StreamBuilder a un documento que no existe
     if (_isNewConversation) {
       return const Center(
         child: Text(
-          'Aún no hay mensajes.\n¡Dile hola a tu asistente!',
+          "Aún no hay mensajes.\n¡Dile hola a tu asistente!",
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 16, color: Colors.grey),
+          style: TextStyle(color: Colors.grey, fontSize: 16),
         ),
       );
     }
 
     return StreamBuilder<QuerySnapshot>(
-      // ... (Consulta de Firestore igual, ya que el ID de conversación ya está asignado)
       stream:
           FirebaseFirestore.instance
               .collection('chats')
@@ -137,26 +150,27 @@ class _ChatScreenState extends State<ChatScreen> {
               .collection('messages')
               .orderBy('createdAt', descending: true)
               .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        if (!snap.hasData || snap.data!.docs.isEmpty) {
           return const Center(
             child: Text(
-              'Aún no hay mensajes.\n¡Dile hola a tu asistente!',
+              "Aún no hay mensajes.\n¡Dile hola a tu asistente!",
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey),
+              style: TextStyle(color: Colors.grey, fontSize: 16),
             ),
           );
         }
 
-        final messages = snapshot.data!.docs;
+        final messages = snap.data!.docs;
+
         return ListView.builder(
           reverse: true,
           itemCount: messages.length,
-          itemBuilder: (context, index) {
-            final msg = messages[index].data() as Map<String, dynamic>;
+          itemBuilder: (context, i) {
+            final msg = messages[i].data() as Map<String, dynamic>;
             final isUser = msg['role'] == 'user';
 
             return Align(
@@ -177,16 +191,16 @@ class _ChatScreenState extends State<ChatScreen> {
                     bottomRight:
                         isUser ? Radius.zero : const Radius.circular(16),
                   ),
-                  boxShadow: [
+                  boxShadow: const [
                     BoxShadow(
                       color: Colors.black12,
                       blurRadius: 3,
-                      offset: const Offset(0, 2),
+                      offset: Offset(0, 2),
                     ),
                   ],
                 ),
                 child: Text(
-                  msg['text'] ?? '',
+                  msg['text'],
                   style: TextStyle(
                     color: isUser ? Colors.white : Colors.black87,
                     fontSize: 15,
@@ -203,23 +217,43 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildMessageInputBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.black12,
             blurRadius: 6,
-            offset: const Offset(0, -2),
+            offset: Offset(0, -2),
           ),
         ],
       ),
       child: Row(
         children: [
+          // 🎤 BOTÓN DE MICRO
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: Colors.redAccent,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.redAccent.withOpacity(0.3),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.mic, color: Colors.white),
+              onPressed: _handleVoiceInput,
+            ),
+          ),
+
           Expanded(
             child: TextField(
               controller: _messageController,
               decoration: InputDecoration(
-                hintText: 'Escribe tu mensaje...',
+                hintText: "Escribe tu mensaje...",
                 filled: true,
                 fillColor: Colors.grey.shade100,
                 contentPadding: const EdgeInsets.symmetric(
@@ -234,14 +268,15 @@ class _ChatScreenState extends State<ChatScreen> {
               onSubmitted: (_) => _sendMessage(),
             ),
           ),
+
           const SizedBox(width: 8),
+
           Container(
             decoration: BoxDecoration(
               color: Colors.blueAccent,
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  // ignore: deprecated_member_use
                   color: Colors.blueAccent.withOpacity(0.3),
                   blurRadius: 6,
                   offset: const Offset(0, 3),
@@ -264,8 +299,8 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Column(
         children: [
           UserAccountsDrawerHeader(
-            accountName: Text(_currentUser?.email?.split('@')[0] ?? 'Usuario'),
-            accountEmail: Text(_currentUser?.email ?? 'Sin correo'),
+            accountName: Text(_currentUser?.email?.split("@")[0] ?? "Usuario"),
+            accountEmail: Text(_currentUser?.email ?? "Sin correo"),
             currentAccountPicture: const CircleAvatar(
               backgroundColor: Colors.white,
               child: Icon(Icons.person, size: 40, color: Colors.blueAccent),
@@ -280,7 +315,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.add_comment, color: Colors.green),
-            title: const Text('Nuevo Chat'),
+            title: const Text("Nuevo Chat"),
             onTap: () {
               Navigator.pushReplacement(
                 context,
@@ -290,13 +325,41 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.history, color: Colors.blueAccent),
-            title: const Text('Historial del Chat'),
+            title: const Text("Historial del Chat"),
             onTap: () => Navigator.pushNamed(context, '/historial'),
           ),
           const Divider(),
           ListTile(
+            leading: const Icon(Icons.home, color: Colors.blueAccent),
+            title: const Text("Inicio"),
+            onTap: () => Navigator.pushNamed(context, '/home'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.menu_book, color: Colors.purple),
+            title: const Text("Librería"),
+            onTap: () => Navigator.pushNamed(context, '/library'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.toys_outlined, color: Colors.orange),
+            title: const Text("Zona Anti-Estrés"),
+            onTap: () => Navigator.pushNamed(context, '/distraction-zone'),
+          ),
+          ListTile(
+            leading: const Icon(
+              Icons.medical_services,
+              color: Colors.redAccent,
+            ),
+            title: const Text("Recursos y Especialistas"),
+            onTap: () => Navigator.pushNamed(context, '/professional-help'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.settings, color: Colors.grey),
+            title: const Text("Configuración"),
+            onTap: () => Navigator.pushNamed(context, '/settings'),
+          ),
+          ListTile(
             leading: const Icon(Icons.logout, color: Colors.redAccent),
-            title: const Text('Cerrar Sesión'),
+            title: const Text("Cerrar Sesión"),
             onTap: () async {
               await FirebaseAuth.instance.signOut();
               if (context.mounted) {
@@ -315,7 +378,7 @@ class _ChatScreenState extends State<ChatScreen> {
       drawer: _buildDrawer(context),
       appBar: AppBar(
         title: const Text(
-          'Asistente IA',
+          "Asistente IA",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.blueAccent,
