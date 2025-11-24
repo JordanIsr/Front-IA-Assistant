@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class OpenAIService {
-  // 👇 AQUÍ PEGAS LA URL QUE TE DIO LA TERMINAL 👇
+  // AQUÍ PEGAS LA URL QUE TE DIO LA TERMINAL
   final String backendUrl = 'https://us-central1-asistant-ia.cloudfunctions.net/chatWithAI'; 
 
   Future<String> sendMessage(String message) async {
