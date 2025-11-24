@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-
 // Importación de pantallas
+import 'package:frontend/screens/topic_detail_screen.dart';
+import 'package:frontend/screens/activity_detail_screen.dart';
 import 'package:frontend/screens/chat_screen.dart';
 import 'package:frontend/screens/historial_screen.dart';
 import 'package:frontend/screens/home_screen.dart';
@@ -20,5 +21,7 @@ class AppRoutes {
     '/library': (context) => const LibraryScreen(),
     '/distraction-zone': (context) => const DistractionZoneScreen(),
     '/professional-help': (context) => const ProfessionalHelpScreen(),
+    '/topic-detail': (context) => const TopicDetailScreen(),
+    '/activity-detail': (context) => const ActivityDetailScreen(),
   };
 }

@@ -39,6 +39,7 @@ dependencies:
   flutter_tts: ^4.0.2
   audioplayers: 6.5.1
   record: ^5.0.1
+  url_launcher: ^6.2.5
 
   # HTTP
   http: ^1.2.2
