@@ -2,31 +2,31 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class OpenAIService {
-  final String apiKey = 'TU_API_KEY_AQUI';
+  // 👇 AQUÍ PEGAS LA URL QUE TE DIO LA TERMINAL 👇
+  final String backendUrl = 'https://us-central1-asistant-ia.cloudfunctions.net/chatWithAI'; 
 
-  Future<String> sendMessage(String prompt) async {
-    final url = Uri.parse('https://api.openai.com/v1/chat/completions');
+  Future<String> sendMessage(String message) async {
+    try {
+      final response = await http.post(
+        Uri.parse(backendUrl),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "message": message, 
+          "userId": "usuario_flutter_app" // Opcional: Aquí podrías mandar el ID real
+        }),
+      );
 
-    final response = await http.post(
-      url,
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer $apiKey",
-      },
-      body: jsonEncode({
-        "model": "gpt-4o-mini",
-        "messages": [
-          {"role": "user", "content": prompt},
-        ],
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final output = data["choices"][0]["message"]["content"];
-      return output;
-    } else {
-      return "Error: ${response.body}";
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // Tu backend devuelve: { "reply": "Respuesta de la IA..." }
+        return data['reply']; 
+      } else {
+        return "Error del servidor (${response.statusCode}): ${response.body}";
+      }
+    } catch (e) {
+      return "Error de conexión: $e";
     }
   }
 }

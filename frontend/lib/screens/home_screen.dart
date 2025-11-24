@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:frontend/screens/widgets/menu_drawer.dart';
+import 'package:frontend/screens/voice_assistant/voice_wakeup_service.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,6 +19,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   // 🚀 NUEVO: Necesitamos un FocusNode para manejar el enfoque del scroll en Desktop/Web.
   final FocusNode _scrollFocusNode = FocusNode();
+  final KeywordSpeechService _leslieVoice = KeywordSpeechService(); // ⬅️ AGREGA ESTO
 
   // Datos con recomendaciones (Los mismos 8 elementos)
   final List<Map<String, dynamic>> _supportMenus = const [
@@ -119,13 +122,29 @@ class _HomeScreenState extends State<HomeScreen>
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-  }
+void initState() {
+  super.initState();
+
+  _animationController = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 2),
+  )..repeat(reverse: true);
+
+  // ✅ INICIALIZAR LA ESCUCHA DE "LESLIE"
+  _leslieVoice.onMessageReady = (msg) {
+    Navigator.pushNamed(
+      context,
+      '/chat',
+      arguments: {
+        "fromVoice": true,
+        "voiceText": msg,
+      },
+    );
+  };
+
+  _leslieVoice.init(); // 🚀 ahora sí empieza a escuchar
+}
+
 
   @override
   void dispose() {
