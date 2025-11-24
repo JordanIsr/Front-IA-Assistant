@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+// Importación necesaria para la librería de PDF (ELIMINADA de aquí, solo se usa en book_viewer_screen.dart).
 import 'package:frontend/screens/distraction_zone_screen.dart';
 import 'package:frontend/screens/home_screen.dart';
 import 'package:frontend/screens/library_screen.dart';
@@ -10,9 +11,16 @@ import 'package:frontend/screens/login_screen.dart';
 import 'package:frontend/screens/register_screen.dart';
 import 'package:frontend/screens/chat_screen.dart';
 import 'package:frontend/screens/historial_screen.dart';
+// IMPLEMENTACIÓN REQUERIDA: Importar la nueva pantalla del visor de libros
+import 'package:frontend/screens/book_viewer_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // NOTA: Si usas la versión de prueba, puedes comentar la línea
+  // de registro de licencia. Si el PDF sigue sin verse, debes obtener
+  // la clave de licencia gratuita en la web de Syncfusion y ponerla aquí.
+  // SyncfusionLicense.registerLicense('TU_CLAVE_DE_LICENCIA_AQUI');
 
   // Inicializa Firebase antes de correr la app
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -39,6 +47,8 @@ class MyApp extends StatelessWidget {
         '/library': (context) => const LibraryScreen(),
         '/distraction-zone': (context) => const DistractionZoneScreen(),
         '/professional-help': (context) => const ProfessionalHelpScreen(),
+        // IMPLEMENTACIÓN REQUERIDA: Agregar la ruta del visor de libros
+        '/book-viewer': (context) => const BookViewerScreen(),
       },
     );
   }

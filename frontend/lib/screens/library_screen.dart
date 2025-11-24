@@ -1,10 +1,5 @@
-// library_screen.dart
-
-// ignore_for_file: deprecated_member_use
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-// Puedes añadir otros imports si son necesarios en tu app, como cloud_firestore, etc.
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -16,44 +11,74 @@ class LibraryScreen extends StatefulWidget {
 class _LibraryScreenState extends State<LibraryScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  String _selectedTopic = 'Todos'; // Tópico de filtro seleccionado
-
-  // 📚 Datos de libros de autoayuda con tópicos definidos
+  String _selectedTopic = 'Todos';
   final List<Map<String, String>> _allBooks = [
+    {
+      'title': 'La Inteligencia Emocional',
+      'author': 'Daniel Goleman',
+      'topic': 'Autoestima y Resiliencia',
+      'pdfPath': 'assets/pdfs/La-Inteligencia-Emocional-Daniel-Goleman-1.pdf',
+    },
+    {
+      'title': 'El Miedo a la Libertad',
+      'author': 'Erich Fromm',
+      'topic': 'Ansiedad y Estrés',
+      'pdfPath': 'assets/pdfs/04.-Erich-Fromm-El-miedo-a-la-libertad.pdf',
+    },
+    {
+      'title': 'Tus Zonas Erróneas',
+      'author': 'Wayne Dyer',
+      'topic': 'Relaciones Personales',
+      'pdfPath': 'assets/pdfs/Tus-zonas-erróneas.pdf',
+    },
+    {
+      'title': 'Pensar Bien, Sentirse Bien',
+      'author': 'Walter Riso',
+      'topic': 'Mindfulness y Bienestar',
+      'pdfPath': 'assets/pdfs/risowalterpensarbiensentirsebien.pdf',
+    },
+    // Estos son ejemplos adicionales que debes crear en tu carpeta si quieres usarlos:
     {
       'title': 'Gestionando la Ansiedad',
       'author': 'Dra. Ana López',
       'topic': 'Ansiedad y Estrés',
+      'pdfPath': 'assets/pdfs/Gestionando_la_Ansiedad.pdf',
     },
     {
       'title': 'El Camino a la Resiliencia',
       'author': 'Dr. Carlos Ruiz',
       'topic': 'Autoestima y Resiliencia',
+      'pdfPath': 'assets/pdfs/Camino_Resiliencia.pdf',
     },
     {
       'title': 'Mindfulness para el Día a Día',
       'author': 'Elena García',
       'topic': 'Relajación y Meditación',
+      'pdfPath': 'assets/pdfs/Mindfulness_Diario.pdf',
     },
     {
       'title': 'Superando la Procrastinación',
       'author': 'Javier Montes',
       'topic': 'Productividad y Enfoque',
+      'pdfPath': 'assets/pdfs/Superando_Procrastinacion.pdf',
     },
     {
       'title': 'Comunicación Asertiva',
       'author': 'María Soto',
       'topic': 'Relaciones Personales',
+      'pdfPath': 'assets/pdfs/Comunicacion_Asertiva.pdf',
     },
     {
       'title': 'Viviendo sin Miedo',
       'author': 'Dra. Ana López',
       'topic': 'Ansiedad y Estrés',
+      'pdfPath': 'assets/pdfs/Viviendo_sin_Miedo.pdf',
     },
     {
       'title': 'El Poder del Sí Mismo',
       'author': 'Dr. Carlos Ruiz',
       'topic': 'Autoestima y Resiliencia',
+      'pdfPath': 'assets/pdfs/Poder_del_Si_Mismo.pdf',
     },
   ];
 
@@ -102,7 +127,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }).toList();
   }
 
-  // 1. ⚙️ Función para construir el Drawer (Copiado de ChatScreen para consistencia)
+  // 1. ⚙️ Función para construir el Drawer
   Drawer _buildDrawer(BuildContext context) {
     // NOTA: En una aplicación real, el UserAuth debe obtenerse aquí también
     final User? currentUser = FirebaseAuth.instance.currentUser;
@@ -246,20 +271,25 @@ class _LibraryScreenState extends State<LibraryScreen> {
     );
   }
 
-  // 4. 📖 Widget para mostrar cada libro (MODIFICADO)
+  // 4. 📖 Widget para mostrar cada libro
   Widget _buildBookCard(Map<String, String> book) {
+    // 🚀 Lógica de navegación: Lleva al usuario a la pantalla del visor
+    void navigateToBookViewer() {
+      // Usamos pushNamed y pasamos el objeto 'book' como argumento.
+      Navigator.pushNamed(
+        context,
+        '/book-viewer',
+        arguments: book, // Pasamos el mapa completo del libro.
+      );
+    }
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
-        // Hace toda la tarjeta clickeable para ver detalles (opcional)
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Viendo detalles de: ${book['title']}...')),
-          );
-          // Lógica para ver detalles del libro antes de la descarga
-        },
+        // Al tocar la tarjeta, navega al visor.
+        onTap: navigateToBookViewer,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(12.0),
@@ -302,18 +332,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    // Botón de Ver o Descargar Libro (EXPLÍCITO)
+                    // Botón de Ver o Descargar Libro
                     OutlinedButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Descargando/Viendo ${book['title']}...',
-                            ),
-                          ),
-                        );
-                        // Aquí iría la lógica para iniciar la descarga o abrir el visor
-                      },
+                      onPressed: navigateToBookViewer,
                       icon: const Icon(Icons.download, size: 18),
                       label: const Text("Ver/Descargar Libro"),
                       style: OutlinedButton.styleFrom(
