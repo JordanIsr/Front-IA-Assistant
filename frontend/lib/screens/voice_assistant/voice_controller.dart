@@ -14,20 +14,39 @@ class VoiceController {
     return await _speech.initialize();
   }
 
-  Future<void> startListening(Function(String) onResult) async {
+  Future<void> startListening(
+    Function(String) onResult, {
+    Function()? onFinal,
+  }) async {
+    isListening = true;
+
     await _speech.listen(
+      listenOptions: SpeechListenOptions(
+  listenMode: ListenMode.dictation,
+  partialResults: true,
+      ),
       onResult: (result) {
         lastUserSpeech = result.recognizedWords;
         onResult(lastUserSpeech);
+
+        // ⚡ Cuando detecta silencio (fin)
+        if (result.finalResult) {
+          isListening = false;
+          if (onFinal != null) onFinal();
+        }
       },
     );
-
-    isListening = true;
   }
 
   Future<void> stopListening() async {
     await _speech.stop();
     isListening = false;
+  }
+
+  Future<void> cancelListening() async {
+    await _speech.stop();
+    isListening = false;
+    lastUserSpeech = "";
   }
 
   Future<void> speak(String text) async {

@@ -6,11 +6,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:frontend/api_service.dart';
 
 // 🎤 Servicios nuevos
-import 'package:frontend/screens/services/speech_service.dart';
 import 'package:frontend/screens/services/text_to_speech_service.dart';
 
 // 📌 IMPORTA TU MENÚ SEPARADO
 import 'package:frontend/screens/widgets/menu_drawer.dart';
+import 'package:frontend/screens/voice_assistant/voice_button.dart';
+import 'voice_assistant/voice_wakeup_service.dart';
+
+
 
 class ChatScreen extends StatefulWidget {
   final String? conversationId;
@@ -21,6 +24,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+final KeywordSpeechService _keywordService = KeywordSpeechService();
   final TextEditingController _messageController = TextEditingController();
   final User? _currentUser = FirebaseAuth.instance.currentUser;
 
@@ -30,12 +34,12 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isSending = false;
 
   // 🎤 Instancias de servicios de voz
-  final SpeechService _speechService = SpeechService();
   final TextToSpeechService _tts = TextToSpeechService();
 
   @override
   void initState() {
     super.initState();
+    _keywordService.init(); 
 
     if (widget.conversationId == null) {
       _conversationId = DateTime.now().millisecondsSinceEpoch.toString();
@@ -48,20 +52,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _keywordService.stop();
     _messageController.dispose();
     super.dispose();
-  }
-
-  // 🎤 Función para procesar voz → texto
-  Future<void> _handleVoiceInput() async {
-    final text = await _speechService.startListening();
-    if (text == null || text.isEmpty) return;
-
-    setState(() {
-      _messageController.text = text;
-    });
-
-    await _sendMessage();
   }
 
   Future<void> _sendMessage() async {
@@ -230,23 +223,27 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           // 🎤 BOTÓN DE MICRO
           Container(
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: Colors.redAccent,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.redAccent.withOpacity(0.3),
-                  blurRadius: 6,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.mic, color: Colors.white),
-              onPressed: _handleVoiceInput,
-            ),
-          ),
+  margin: const EdgeInsets.only(right: 8),
+  decoration: BoxDecoration(
+    color: Colors.redAccent,
+    shape: BoxShape.circle,
+    boxShadow: [
+      BoxShadow(
+        color: Colors.redAccent.withOpacity(0.3),
+        blurRadius: 6,
+        offset: const Offset(0, 3),
+      ),
+    ],
+  ),
+  child: VoiceButton(
+    onMessageCompleted: (userText, aiText) async {
+      // Manda el texto como si fuera escrito
+      _messageController.text = userText;
+      await _sendMessage();
+    },
+  ),
+),
+
 
           Expanded(
             child: TextField(
